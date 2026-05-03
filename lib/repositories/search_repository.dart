@@ -1,157 +1,74 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/song.dart';
 import '../models/artist.dart';
 import '../models/album.dart';
 import '../models/playlist.dart';
 import '../models/podcast.dart';
 import '../helpers/local_recent_search_helper.dart';
+import '../services/api_client.dart';
 
 class SearchRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
 
-  SearchRepository(this._supabase);
+  SearchRepository(this._api);
 
-  // ─── Multi-Entity Search ──────────────────────────────────────────────────
+  // ─── Multi-Entity Search (Unified — single API call) ──────────────────────
   
   Future<List<Song>> searchSongs(String query) async {
-    try {
-      // Step 1: Search by title
-      final titleResponse = await _supabase
-          .from('songs')
-          .select()
-          .ilike('title', '%$query%')
-          .eq('is_active', true)
-          .limit(20);
-
-      // Step 2: Search by genre join
-      final genreResponse = await _supabase
-          .from('songs')
-          .select('*, song_genres!inner(genres!inner(name))')
-          .ilike('song_genres.genres.name', '%$query%')
-          .eq('is_active', true)
-          .limit(20);
-
-      // Step 3: Search by mood join
-      final moodResponse = await _supabase
-          .from('songs')
-          .select('*, song_moods!inner(moods!inner(name))')
-          .ilike('song_moods.moods.name', '%$query%')
-          .eq('is_active', true)
-          .limit(20);
-
-      // Combine and remove duplicates based on song ID
-      final Map<int, Song> uniqueSongs = {};
-      
-      for (var s in (titleResponse as List)) {
-        final song = Song.fromJson(s);
-        uniqueSongs[song.id] = song;
-      }
-      
-      for (var s in (genreResponse as List)) {
-        final song = Song.fromJson(s);
-        uniqueSongs[song.id] = song;
-      }
-
-      for (var s in (moodResponse as List)) {
-        final song = Song.fromJson(s);
-        uniqueSongs[song.id] = song;
-      }
-
-      // Step 4: Search by hashtag join
-      final hashtagResponse = await _supabase
-          .from('songs')
-          .select('*, song_hashtags!inner(hashtags!inner(name))')
-          .ilike('song_hashtags.hashtags.name', '%$query%')
-          .eq('is_active', true)
-          .limit(20);
-
-      for (var s in (hashtagResponse as List)) {
-        final song = Song.fromJson(s);
-        uniqueSongs[song.id] = song;
-      }
-
-      return uniqueSongs.values.toList();
-    } catch (e) {
-      // Fallback to simple title search if Join fails (e.g. table mapping issues)
-      final fallback = await _supabase
-          .from('songs')
-          .select()
-          .ilike('title', '%$query%')
-          .eq('is_active', true)
-          .limit(20);
-      return (fallback as List).map((e) => Song.fromJson(e)).toList();
-    }
+    final result = await _api.search(query);
+    final songs = result['songs'] as List? ?? [];
+    return songs.map((e) => Song.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<List<Artist>> searchArtists(String query) async {
-    final response = await _supabase
-        .from('artists')
-        .select()
-        .ilike('name', '%$query%')
-        .limit(20);
-    return (response as List).map((e) => Artist.fromJson(e)).toList();
+    final result = await _api.search(query);
+    final artists = result['artists'] as List? ?? [];
+    return artists.map((e) => Artist.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<List<Album>> searchAlbums(String query) async {
-    final response = await _supabase
-        .from('albums')
-        .select()
-        .ilike('title', '%$query%')
-        .limit(10);
-    return (response as List).map((e) => Album.fromJson(e)).toList();
+    final result = await _api.search(query);
+    final albums = result['albums'] as List? ?? [];
+    return albums.map((e) => Album.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<List<Playlist>> searchPlaylists(String query) async {
-    final response = await _supabase
-        .from('playlists')
-        .select()
-        .ilike('name', '%$query%')
-        .eq('is_public', true)
-        .limit(10);
-    return (response as List).map((e) => Playlist.fromJson(e)).toList();
+    final result = await _api.search(query);
+    final playlists = result['playlists'] as List? ?? [];
+    return playlists.map((e) => Playlist.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<List<Podcast>> searchPodcasts(String query) async {
-    final response = await _supabase
-        .from('podcasts')
-        .select('*, podcast_channels(id, name)')
-        .ilike('title', '%$query%')
-        .limit(10);
-    return (response as List).map((e) => Podcast.fromJson(e)).toList();
+    final result = await _api.search(query);
+    final podcasts = result['podcasts'] as List? ?? [];
+    return podcasts.map((e) => Podcast.fromJson(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<List<Map<String, dynamic>>> searchGenres(String query) async {
-    final response = await _supabase
-        .from('genres')
-        .select()
-        .ilike('name', '%$query%')
-        .eq('is_active', true)
-        .limit(5);
-    return List<Map<String, dynamic>>.from(response);
+    final result = await _api.discover();
+    final genres = result['genres'] as List? ?? [];
+    return List<Map<String, dynamic>>.from(genres)
+        .where((g) => (g['name'] as String? ?? '').toLowerCase().contains(query.toLowerCase()))
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> searchMoods(String query) async {
     try {
-      final response = await _supabase
-          .from('moods')
-          .select()
-          .ilike('name', '%$query%')
-          .eq('is_active', true)
-          .limit(5);
-      return List<Map<String, dynamic>>.from(response);
+      final result = await _api.discover();
+      final moods = result['moods'] as List? ?? [];
+      return List<Map<String, dynamic>>.from(moods)
+          .where((m) => (m['name'] as String? ?? '').toLowerCase().contains(query.toLowerCase()))
+          .toList();
     } catch (e) {
       return [];
     }
   }
 
   Future<List<Map<String, dynamic>>> searchHashtags(String query) async {
-    final response = await _supabase
-        .from('hashtags')
-        .select()
-        .ilike('name', '%$query%')
-        .eq('is_active', true)
-        .limit(10);
-    return List<Map<String, dynamic>>.from(response);
+    final result = await _api.discover();
+    final hashtags = result['hashtags'] as List? ?? [];
+    return List<Map<String, dynamic>>.from(hashtags)
+        .where((h) => (h['name'] as String? ?? '').toLowerCase().contains(query.toLowerCase()))
+        .toList();
   }
 
   // ─── Search History ────────────────────────────────────────────────────────
@@ -159,7 +76,6 @@ class SearchRepository {
   final LocalRecentSearchHelper _localHelper = LocalRecentSearchHelper();
 
   Future<List<Map<String, dynamic>>> getRecentSearches(String? userId) async {
-    // Always use local helper as requested (save local for everyone)
     return await _localHelper.getRecentSearches();
   }
 
@@ -181,13 +97,10 @@ class SearchRepository {
       'image_url': imageUrl,
       'created_at': DateTime.now().toIso8601String(),
     };
-
-    // Always use local helper
     await _localHelper.saveSearch(item);
   }
 
   Future<void> clearRecentSearches(String? userId) async {
-    // Always clear local
     await _localHelper.clearAll();
   }
 
@@ -197,7 +110,6 @@ class SearchRepository {
     String? contentId,
     String? keyword,
   }) async {
-    // Always remove from local
     await _localHelper.removeSearch({
       'content_type': contentType,
       'content_id': contentId,
@@ -208,41 +120,26 @@ class SearchRepository {
   // ─── Discovery Data ────────────────────────────────────────────────────────
 
   Future<List<String>> getTrendingKeywords() async {
-    final response = await _supabase
-        .from('trending_search_keywords')
-        .select('keyword')
-        .limit(5);
-    return (response as List).map((e) => e['keyword'] as String).toList();
+    final result = await _api.discover();
+    final keywords = result['trending_keywords'] as List? ?? [];
+    return keywords.map((e) => e.toString()).toList();
   }
 
   Future<List<Map<String, dynamic>>> getHashtags() async {
-    final response = await _supabase
-        .from('hashtags')
-        .select()
-        .eq('is_active', true)
-        .limit(10);
-    return List<Map<String, dynamic>>.from(response);
+    final result = await _api.discover();
+    return List<Map<String, dynamic>>.from(result['hashtags'] as List? ?? []);
   }
 
   Future<List<Map<String, dynamic>>> getGenres() async {
-    final response = await _supabase
-        .from('genres')
-        .select()
-        .eq('is_active', true)
-        .limit(20);
-    return List<Map<String, dynamic>>.from(response);
+    final result = await _api.discover();
+    return List<Map<String, dynamic>>.from(result['genres'] as List? ?? []);
   }
 
   Future<List<Map<String, dynamic>>> getMoods() async {
     try {
-      final response = await _supabase
-          .from('moods')
-          .select()
-          .eq('is_active', true)
-          .limit(20);
-      return List<Map<String, dynamic>>.from(response);
+      final result = await _api.discover();
+      return List<Map<String, dynamic>>.from(result['moods'] as List? ?? []);
     } catch (e) {
-      // If moods table doesn't exist yet, gracefully return empty
       return [];
     }
   }

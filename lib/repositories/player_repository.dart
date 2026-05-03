@@ -1,19 +1,16 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/song.dart';
 import '../models/podcast.dart';
+import '../services/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PlayerRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
+  final SupabaseClient _supabase; // Kept for logListen (direct insert)
 
-  PlayerRepository(this._supabase);
+  PlayerRepository(this._api, this._supabase);
 
   Future<Map<String, dynamic>?> fetchPlayerState(String userId) async {
-    final response = await _supabase
-        .from('user_player_state')
-        .select()
-        .eq('user_id', userId)
-        .maybeSingle();
-    return response;
+    return await _api.fetchPlayerState();
   }
 
   Future<void> updatePlayerState({
@@ -24,14 +21,12 @@ class PlayerRepository {
     required String repeatMode,
     required bool shuffleEnabled,
   }) async {
-    await _supabase.from('user_player_state').upsert({
-      'user_id': userId,
+    await _api.updatePlayerState({
       'current_song_id': currentSongId,
       'current_playlist_id': currentPlaylistId,
       'position_seconds': positionSeconds,
       'repeat_mode': repeatMode,
       'shuffle_enabled': shuffleEnabled,
-      'updated_at': DateTime.now().toIso8601String(),
     });
   }
 

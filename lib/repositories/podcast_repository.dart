@@ -1,21 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/podcast.dart';
 import '../models/podcast_channel.dart';
+import '../services/api_client.dart';
 
 class PodcastRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
+  final SupabaseClient _supabase; // Kept for subscription management
 
-  PodcastRepository(this._supabase);
+  PodcastRepository(this._api, this._supabase);
 
   Future<List<Podcast>> fetchAllPodcasts() async {
-    final response = await _supabase
-        .from('podcasts')
-        .select('*, podcast_channels(*)')
-        .eq('is_active', true)
-        .order('created_at', ascending: false)
-        .limit(20);
-
-    return (response as List).map((row) => Podcast.fromJson(row)).toList();
+    final data = await _api.fetchPodcasts();
+    return data.map((row) => Podcast.fromJson(row)).toList();
   }
 
   Future<List<PodcastChannel>> fetchSubscribedChannels(String userId) async {
@@ -32,14 +28,8 @@ class PodcastRepository {
   }
 
   Future<List<Podcast>> fetchPodcastsByChannel(String channelId) async {
-    final response = await _supabase
-        .from('podcasts')
-        .select('*, podcast_channels(*)')
-        .eq('channel_id', channelId)
-        .eq('is_active', true)
-        .order('created_at', ascending: false);
-
-    return (response as List).map((row) => Podcast.fromJson(row)).toList();
+    final data = await _api.fetchPodcastsByChannel(channelId);
+    return data.map((row) => Podcast.fromJson(row)).toList();
   }
 
   Future<PodcastChannel> getChannelDetail(String channelId) async {
@@ -67,21 +57,15 @@ class PodcastRepository {
         'user_id': userId,
         'channel_id': channelId,
       });
-      // Optional: RPC for decrementing subscriber count cache
-      await _supabase.rpc('decrement_channel_subscribers', params: {'channel_id_param': channelId}).catchError((_) {});
     } else {
       await _supabase.from('channel_subscriptions').insert({
         'user_id': userId,
         'channel_id': channelId,
       });
-      // Optional: RPC for incrementing subscriber count cache
-      await _supabase.rpc('increment_channel_subscribers', params: {'channel_id_param': channelId}).catchError((_) {});
     }
   }
 
   Future<List<Podcast>> fetchLatestPodcastsFromSubscriptions(String userId) async {
-    // This is more complex, fetch podcasts where channel_id is in subscriptions
-    // For simplicity, we fetch all subscribed channel IDs first
     final subs = await _supabase
         .from('channel_subscriptions')
         .select('channel_id')

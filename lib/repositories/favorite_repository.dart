@@ -1,62 +1,30 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/song.dart';
+import '../services/api_client.dart';
 
 class FavoriteRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
 
-  FavoriteRepository(this._supabase);
+  FavoriteRepository(this._api);
 
-  /// Check if a song is liked by a specific user.
+  /// Check if a song is liked by the current user.
   Future<bool> isSongLiked(String userId, int songId) async {
-    final response = await _supabase
-        .from('favorites')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('song_id', songId)
-        .maybeSingle();
-    return response != null;
+    return await _api.checkFavorite(songId);
   }
 
   /// Toggle like status for a song.
-  /// Calls Supabase RPCs to update like counts in the background.
   Future<void> toggleLike(String userId, int songId, bool isAlreadyLiked) async {
-    if (isAlreadyLiked) {
-      await _supabase.from('favorites').delete().match({
-        'user_id': userId,
-        'song_id': songId,
-      });
-      // Try to decrement count cache via RPC
-      await _supabase.rpc('decrement_song_likes', params: {'song_id_param': songId}).catchError((_) {});
-    } else {
-      await _supabase.from('favorites').insert({
-        'user_id': userId,
-        'song_id': songId,
-      });
-      // Try to increment count cache via RPC
-      await _supabase.rpc('increment_song_likes', params: {'song_id_param': songId}).catchError((_) {});
-    }
+    await _api.toggleFavorite(songId);
   }
 
-  /// Fetch all songs liked by a user.
+  /// Fetch all songs liked by the current user.
   Future<List<Song>> fetchLikedSongs(String userId) async {
-    final response = await _supabase
-        .from('favorites')
-        .select('song_id, songs:songs!favorites_song_id_fkey(*)')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false);
-
-    return (response as List)
-        .where((row) => row['songs'] != null)
-        .map((row) => Song.fromJson(row['songs'] as Map<String, dynamic>))
-        .toList();
+    final data = await _api.fetchFavorites();
+    return data.map((e) => Song.fromJson(e)).toList();
   }
 
   /// Get the total count of liked songs for a user.
   Future<int> getLikedSongsCount(String userId) async {
-    final response = await _supabase
-        .from('favorites')
-        .select('id')
-        .eq('user_id', userId);
-    return (response as List).length;
+    final data = await _api.fetchFavorites();
+    return data.length;
   }
 }

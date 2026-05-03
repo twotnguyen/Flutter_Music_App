@@ -1,62 +1,37 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/playlist.dart';
 import '../models/album.dart';
 import '../models/song.dart';
+import '../services/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CollectionRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
+  final SupabaseClient _supabase; // Kept for save/unsave (direct RPC calls)
 
-  CollectionRepository(this._supabase);
+  CollectionRepository(this._api, this._supabase);
 
   /// Fetch system curated playlists.
   Future<List<Playlist>> fetchSystemPlaylists() async {
-    final response = await _supabase
-        .from('playlists')
-        .select()
-        .eq('playlist_type', 'system')
-        .eq('is_public', true)
-        .limit(10);
-        
-    return (response as List).map((e) => Playlist.fromJson(e)).toList();
+    final data = await _api.fetchSystemPlaylists();
+    return data.map((e) => Playlist.fromJson(e)).toList();
   }
 
   /// Fetch new albums.
   Future<List<Album>> fetchNewAlbums() async {
-    final response = await _supabase
-        .from('albums')
-        .select()
-        .order('release_date', ascending: false)
-        .limit(10);
-        
-    return (response as List).map((e) => Album.fromJson(e)).toList();
+    final data = await _api.fetchNewAlbums();
+    return data.map((e) => Album.fromJson(e)).toList();
   }
 
   /// Get details and songs of a playlist.
   Future<List<Song>> fetchPlaylistSongs(int playlistId) async {
-    final response = await _supabase
-        .from('playlist_songs')
-        .select('position, songs(*)')
-        .eq('playlist_id', playlistId)
-        .order('position');
-
-    return (response as List)
-        .where((row) => row['songs'] != null)
-        .map((row) => Song.fromJson(row['songs'] as Map<String, dynamic>))
-        .toList();
+    final data = await _api.fetchPlaylistSongs(playlistId);
+    return data.map((e) => Song.fromJson(e)).toList();
   }
 
   /// Get details and songs of an album.
   Future<List<Song>> fetchAlbumSongs(int albumId) async {
-    final response = await _supabase
-        .from('album_songs')
-        .select('track_number, songs(*)')
-        .eq('album_id', albumId)
-        .order('track_number');
-
-    return (response as List)
-        .where((row) => row['songs'] != null)
-        .map((row) => Song.fromJson(row['songs'] as Map<String, dynamic>))
-        .toList();
+    final data = await _api.fetchAlbumSongs(albumId);
+    return data.map((e) => Song.fromJson(e)).toList();
   }
 
   /// Check if a playlist is saved/bookmarked by a user.

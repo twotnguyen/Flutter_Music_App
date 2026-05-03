@@ -1,20 +1,17 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/playlist.dart';
+import '../services/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PlaylistRepository {
-  final SupabaseClient _supabase;
+  final ApiClient _api;
+  final SupabaseClient _supabase; // Kept for CRUD operations requiring direct DB access
 
-  PlaylistRepository(this._supabase);
+  PlaylistRepository(this._api, this._supabase);
 
   /// Fetch all playlists owned by a user.
   Future<List<Playlist>> fetchUserOwnedPlaylists(String userId) async {
-    final response = await _supabase
-        .from('playlists')
-        .select()
-        .eq('user_id', userId)
-        .order('created_at', ascending: false);
-        
-    return (response as List).map((e) => Playlist.fromJson(e)).toList();
+    final data = await _api.fetchUserPlaylists();
+    return data.map((e) => Playlist.fromJson(e)).toList();
   }
 
   /// Create a new playlist.
@@ -25,19 +22,13 @@ class PlaylistRepository {
     List<int> songIds = const [],
     String? coverUrl,
   }) async {
-    // 1. Insert the playlist
-    final response = await _supabase.from('playlists').insert({
-      'user_id': userId,
-      'name': name,
-      if (description != null && description.isNotEmpty) 'description': description,
-      if (coverUrl != null && coverUrl.isNotEmpty) 'cover_url': coverUrl,
-      'playlist_type': 'user',
-      'is_public': false,
-    }).select().single();
+    final data = await _api.createPlaylist(
+      name: name,
+      description: description,
+      coverUrl: coverUrl,
+    );
+    final playlist = Playlist.fromJson(data);
 
-    final playlist = Playlist.fromJson(response);
-
-    // 2. Insert playlist_songs if any
     if (songIds.isNotEmpty) {
       await addSongsToPlaylist(playlist.id, songIds);
     }
@@ -49,7 +40,6 @@ class PlaylistRepository {
   Future<void> addSongsToPlaylist(int playlistId, List<int> songIds) async {
     if (songIds.isEmpty) return;
 
-    // Get current max position
     final existing = await _supabase
         .from('playlist_songs')
         .select('position')
@@ -84,7 +74,7 @@ class PlaylistRepository {
 
   /// Delete a playlist.
   Future<void> deletePlaylist(int playlistId) async {
-    await _supabase.from('playlists').delete().eq('id', playlistId);
+    await _api.deletePlaylist(playlistId);
   }
 
   /// Rename a playlist.
