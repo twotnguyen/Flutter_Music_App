@@ -121,33 +121,79 @@ class AppErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.alertTriangle, size: 48, color: Colors.orange),
-            const SizedBox(height: AppSpacing.m),
-            Text(
-              'Đã có lỗi xảy ra',
-              style: Theme.of(context).textTheme.titleMedium,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxHeight < 200;
+
+        if (isCompact) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.s),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(LucideIcons.alertTriangle, size: 20, color: Colors.orange),
+                      const SizedBox(width: AppSpacing.s),
+                      Text(
+                        'Đã có lỗi xảy ra',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontSize: 14,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s),
+                  OutlinedButton.icon(
+                    onPressed: onRetry,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(LucideIcons.refreshCw, size: 12),
+                    label: const Text(
+                      'Thử lại',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.s),
-            Text(
-              error ?? 'Không thể tải dữ liệu. Vui lòng thử lại.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.textSecondary),
+          );
+        }
+
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(LucideIcons.alertTriangle, size: 48, color: Colors.orange),
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  'Đã có lỗi xảy ra',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.s),
+                Text(
+                  error ?? 'Không thể tải dữ liệu. Vui lòng thử lại.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.l),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(LucideIcons.refreshCw, size: 16),
+                  label: const Text('Thử lại'),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.l),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(LucideIcons.refreshCw, size: 16),
-              label: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
