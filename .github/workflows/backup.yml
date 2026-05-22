@@ -23,17 +23,18 @@ jobs:
       - name: Backup Database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           mkdir -p backups
           
           # Xuất cấu trúc database (Schema)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/schema.sql
           
           # Xuất dữ liệu của các bảng (Data only)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/data.sql --data-only --use-copy
+          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/data.sql --data-only --use-copy
           
           # Xuất các vai trò và phân quyền (Roles)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/roles.sql --role-only
 
       - name: Commit and Push backups
         run: |
