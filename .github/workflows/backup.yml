@@ -1,0 +1,45 @@
+name: Supabase Database Backup
+
+on:
+  schedule:
+    # Tự động chạy lúc 00:00 hàng ngày (theo giờ UTC)
+    # Tương đương 07:00 sáng hàng ngày theo giờ Việt Nam (UTC+7)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Cho phép kích hoạt thủ công từ giao diện GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+
+      - name: Backup Database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backups
+          
+          # Xuất cấu trúc database (Schema)
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
+          
+          # Xuất dữ liệu của các bảng (Data only)
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/data.sql --data-only --use-copy
+          
+          # Xuất các vai trò và phân quyền (Roles)
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/roles.sql --role-only
+
+      - name: Commit and Push backups
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          # Chỉ commit nếu có sự thay đổi dữ liệu
+          git commit -m "Supabase backup: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push
