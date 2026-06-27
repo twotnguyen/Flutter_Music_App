@@ -4,7 +4,7 @@ on:
   schedule:
     # Tự động chạy lúc 00:00 hàng ngày (theo giờ UTC)
     # Tương đương 07:00 sáng hàng ngày theo giờ Việt Nam (UTC+7)
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
   workflow_dispatch: # Cho phép kích hoạt thủ công từ giao diện GitHub
 
 jobs:
@@ -22,19 +22,23 @@ jobs:
 
       - name: Backup Database
         env:
+          # Đảm bảo SUPABASE_DB_URL đã có chứa sẵn password
+          # Ví dụ: postgresql://postgres:[PASSWORD]@db.xxxx.supabase.co:5432/postgres
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           mkdir -p backups
-          
+
           # Xuất cấu trúc database (Schema)
-          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/schema.sql
-          
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
+
           # Xuất dữ liệu của các bảng (Data only)
-          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/data.sql --data-only --use-copy
-          
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/data.sql --data-only --use-copy
+
           # Xuất các vai trò và phân quyền (Roles)
-          supabase db dump --db-url "$SUPABASE_DB_URL" --password "$SUPABASE_DB_PASSWORD" -f backups/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/roles.sql --role-only
+
+          # (Tuỳ chọn) Nén các file lại để tránh làm phình to repo git
+          gzip -f backups/schema.sql backups/data.sql backups/roles.sql
 
       - name: Commit and Push backups
         run: |
