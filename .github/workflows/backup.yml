@@ -35,7 +35,7 @@ jobs:
               -d "$DB_URL" -f /backups/schema.sql --schema-only
             
             echo "Dumping data..."
-            pg_dump -a --use-copy \
+            pg_dump -a \
               --exclude-schema="auth" --exclude-schema="storage" --exclude-schema="graphql" \
               --exclude-schema="realtime" --exclude-schema="supabase_functions" \
               --exclude-schema="supabase_migrations" --exclude-schema="vault" \
