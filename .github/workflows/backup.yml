@@ -27,6 +27,12 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           mkdir -p backups
+          
+          # Cấu hình Supabase CLI sử dụng PostgreSQL 17 để khớp với server
+          mkdir -p supabase
+          echo '[db]' > supabase/config.toml
+          echo 'major_version = 17' >> supabase/config.toml
+
 
           # Xuất cấu trúc database (Schema)
           supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
