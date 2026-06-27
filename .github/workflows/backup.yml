@@ -17,34 +17,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-
-      - name: Backup Database
+      - name: Backup Database (Native Docker PG17)
         env:
           # Đảm bảo SUPABASE_DB_URL đã có chứa sẵn password
-          # Ví dụ: postgresql://postgres:[PASSWORD]@db.xxxx.supabase.co:5432/postgres
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           mkdir -p backups
           
-          # Cấu hình Supabase CLI sử dụng PostgreSQL 17 để khớp với server
-          mkdir -p supabase
-          echo '[db]' > supabase/config.toml
-          echo 'major_version = 17' >> supabase/config.toml
-
-
-          # Xuất cấu trúc database (Schema)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
-
-          # Xuất dữ liệu của các bảng (Data only)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/data.sql --data-only --use-copy
-
-          # Xuất các vai trò và phân quyền (Roles)
-          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/roles.sql --role-only
+          # Sử dụng image postgres:17 chính thức qua Docker thay vì Supabase CLI để tránh lỗi phiên bản
+          docker run --rm -v $(pwd)/backups:/backups -e DB_URL="$SUPABASE_DB_URL" postgres:17 bash -c '
+            echo "Dumping schema..."
+            pg_dump --clean \
+              --exclude-schema="auth" --exclude-schema="storage" --exclude-schema="graphql" \
+              --exclude-schema="realtime" --exclude-schema="supabase_functions" \
+              --exclude-schema="supabase_migrations" --exclude-schema="vault" \
+              --exclude-schema="extensions" --exclude-schema="pgbouncer" --exclude-schema="pgsodium" \
+              -d "$DB_URL" -f /backups/schema.sql --schema-only
+            
+            echo "Dumping data..."
+            pg_dump -a --use-copy \
+              --exclude-schema="auth" --exclude-schema="storage" --exclude-schema="graphql" \
+              --exclude-schema="realtime" --exclude-schema="supabase_functions" \
+              --exclude-schema="supabase_migrations" --exclude-schema="vault" \
+              --exclude-schema="extensions" --exclude-schema="pgbouncer" --exclude-schema="pgsodium" \
+              -d "$DB_URL" -f /backups/data.sql
+          '
 
           # (Tuỳ chọn) Nén các file lại để tránh làm phình to repo git
-          gzip -f backups/schema.sql backups/data.sql backups/roles.sql
+          gzip -f backups/schema.sql backups/data.sql
 
       - name: Commit and Push backups
         run: |
